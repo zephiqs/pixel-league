@@ -66,7 +66,7 @@ const C = {
 /* ---------- bitmap font 3x5 ---------- */
 const FONT = {};
 ('A:010101111101101 B:110101110101110 C:011100100100011 D:110101101101110 E:111100110100111 F:111100110100100 G:011100101101011 H:101101111101101 I:111010010010111 J:001001001101010 K:101101110101101 L:100100100100111 M:101111111101101 N:111101101101101 O:010101101101010 P:110101110100100 Q:010101101111011 R:110101110101101 S:011100010001110 T:111010010010010 U:101101101101111 V:101101101101010 W:101101111111101 X:101101010101101 Y:101101010010010 Z:111001010100111 ' +
- '0:111101101101111 1:010110010010111 2:110001010100111 3:110001010001110 4:101101111001001 5:111100110001110 6:011100111101111 7:111001010010010 8:111101111101111 9:111101111001110 -:000000111000000 !:010010010000010 %:101001010100101 /:001001010100100 ::000010000010000 .:000000000000010 +:000010111010000 ?:110001010000010 \':010010000000000 >:100010001010100 <:001010100010001').split(' ').forEach(s => { FONT[s[0]] = s.slice(2); });
+ '0:111101101101111 1:010110010010111 2:110001010100111 3:110001010001110 4:101101111001001 5:111100110001110 6:011100111101111 7:111001010010010 8:111101111101111 9:111101111001110 -:000000111000000 !:010010010000010 %:101001010100101 /:001001010100100 ::000010000010000 .:000000000000010 +:000010111010000 ?:110001010000010 \':010010000000000 >:100010001010100 =:000111000111000 <:001010100010001').split(' ').forEach(s => { FONT[s[0]] = s.slice(2); });
 function glyphs(g, str, x, y, col, sc, sh) {
   str = String(str).toUpperCase(); const so = Math.max(1, Math.round(sc / 3));
   for (let pass = sh ? 0 : 1; pass < 2; pass++) {
@@ -206,7 +206,7 @@ function planShot(d, e) {
 /* ---------- state ---------- */
 const P = { x: 200, h: 0, vh: 0, vx: 0, face: 1, ground: true, anim: 0, speed: 0, shot: null, dunk: null, move: null, moveCd: 0, chain: 0, land: 0, bob: 0 };
 const B = { x: 210, y: 220, vx: 0, vy: 0, mode: 'held', dribT: 0.5, age: 0, scored: false, resolved: true, info: null, rest: 0, prevY: 220, rimHit: false };
-const S = { state: 'title', t: 0, score: 0, streak: 0, made: 0, att: 0, shake: 0, rimShake: 0, netSway: 0, netT: 0, last: '', best: 0, hint: '' };
+const S = { state: 'loading', t: 0, score: 0, streak: 0, made: 0, att: 0, shake: 0, rimShake: 0, netSway: 0, netT: 0, last: '', best: 0, hint: '' };
 const IN = { left: false, right: false, sprint: false, ax: 0, shootHeld: false };
 const FX = [];
 function pop(txt, col, x, y) { FX.push({ txt, col, x: x == null ? P.x : x, y: y == null ? GROUND - P.h - 56 : y, t: 0 }); }
@@ -320,6 +320,7 @@ const ballCB = {
 /* ---------- update ---------- */
 function update(dt) {
   S.t += dt;
+  if (S.state === 'loading') { updateLoading(dt); return; }
   if (S.state !== 'play') { P.anim += dt * 2; return; }
   const sh = P.shot, dk = P.dunk;
   // horizontal input
@@ -418,54 +419,61 @@ function drawHoop() {
 }
 function drawBall(x, y, rot) {
   x = Math.round(x); y = Math.round(y);
-  R(x - 3, y - 4, 7, 9, C.ball); R(x - 4, y - 3, 9, 7, C.ball); R(x - 2, y - 5, 5, 11, C.ball);
-  R(x - 3, y - 3, 3, 2, C.ballL); R(x - 4, y - 1, 9, 1, C.ballD); R(x, y - 5, 1, 11, C.ballD);
-  const k = Math.round(rot) % 4; if (k === 1 || k === 3) { R(x - 3, y + 2, 7, 1, C.ballD); } 
+  const K0 = '#14141c';
+  R(x - 3, y - 5, 7, 1, K0); R(x - 4, y - 4, 9, 9, K0); R(x - 3, y + 5, 7, 1, K0);          // outline
+  R(x - 2, y - 4, 5, 1, C.ball); R(x - 3, y - 3, 7, 7, C.ball); R(x - 2, y + 4, 5, 1, C.ball);
+  R(x - 3, y + 2, 7, 2, C.ballD); R(x - 2, y - 3, 2, 2, C.ballL);
+  const sx = Math.round(Math.sin(rot * 0.6) * 2);
+  R(x + sx, y - 4, 1, 9, K0); R(x - 3, y, 7, 1, K0);                                          // seams
+  if (sx > 0) R(x - 3, y - 3, 1, 2, K0); else R(x + 3, y - 3, 1, 2, K0);
 }
-function drawPlayer() {
-  const f = P.face, x = Math.round(P.x), fy = Math.round(GROUND - P.h), sh = P.shot, dk = P.dunk, air = P.h > 1;
-  // shadow
-  const ss = clamp(1 - P.h / 80, 0.4, 1); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x - Math.round(9 * ss), GROUND - 1, Math.round(18 * ss), 3);
-  const bx = (dx, dy, w, h, c) => R(x + (f > 0 ? dx : -dx - w), fy + dy, w, h, c);
-  const pt = (dx, dy) => [x + f * dx, fy + dy];
+/* ---------- the player: chunky pixel sprite with a black outline ---------- */
+const pc = document.createElement('canvas'); pc.width = 96; pc.height = 96; const pg = pc.getContext('2d');
+const sc2 = document.createElement('canvas'); sc2.width = 96; sc2.height = 96; const sg = sc2.getContext('2d');
+const K = { s: '#7b3a1b', sh: '#5a2810', hi: '#9a5330', rj: '#d62f2f', rd: '#a31d25', bk: '#16161d', wh: '#ffffff', shoe: '#55555f', shoeD: '#2e2e36' };
+function drawPlayer(fyO, shY) {
+  const f = P.face, x = Math.round(P.x), fy = fyO != null ? fyO : Math.round(GROUND - P.h), air = P.h > 1, sh = P.shot, dk = P.dunk;
+  const ss = clamp(1 - P.h / 80, 0.4, 1); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x - Math.round(10 * ss), (shY != null ? shY : GROUND) - 1, Math.round(20 * ss), 3);
+  pg.setTransform(1, 0, 0, 1, 0, 0); pg.clearRect(0, 0, 96, 96); pg.setTransform(f, 0, 0, 1, 48, 72);
+  const rc = (a, b, w, h, c) => { pg.fillStyle = c; pg.fillRect(a, b, w, h); };
+  const ln = (x0, y0, x1, y1, c, w) => {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1); pg.fillStyle = c;
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+    for (let n = 0; n < 200; n++) { pg.fillRect(x0 - (w >> 1), y0 - (w >> 1), w, w); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
+  };
+  const blob = (a, b, w, h, c) => { rc(a + 2, b, w - 4, h, c); rc(a, b + 2, w, h - 4, c); rc(a + 1, b + 1, w - 2, h - 2, c); };
   const run = clamp(P.speed / 60, 0, 1), ph = P.anim * 1.6, sw = Math.sin(ph), cw = Math.cos(ph);
-  let crouch = 0; if (sh && sh.phase === 'gather') crouch = 3 + sh.m * 2; else if (P.land > 0) crouch = 3 * (P.land / 0.12); else if (P.move) crouch = 2 + 3 * Math.sin(Math.PI * clamp(P.move.t / P.move.dur, 0, 1));
-  const lean = (sh && sh.phase === 'gather') ? 0 : run * 1.2;
-  // legs: hip at (0, -12 + crouch)
-  const hipY = -12 + crouch;
-  let legs;
-  if (air) { const t = clamp(P.vh / 200, -1, 1); legs = [[-2, -3 - 3 + 0 * t, 0], [3, -6, 0]]; if (dk || (sh && sh.phase === 'jump')) legs = [[-3, -4, 0], [3, -8, 0]]; }
-  else legs = [[sw * 6 * run, -3 - Math.max(0, cw) * 3 * run, 0], [-sw * 6 * run, -3 - Math.max(0, -cw) * 3 * run, 0]];
-  const hip = pt(0, hipY);
-  // back leg
-  let lf = pt(legs[1][0], legs[1][1]); line(hip[0], hip[1], lf[0], lf[1] - 1, C.skinD, 3); R(lf[0] - (f > 0 ? 1 : 3), lf[1] - 1, 5, 4, C.shoe); R(lf[0] - (f > 0 ? 1 : 3), lf[1] + 2, 5, 1, C.sole);
-  // back arm
-  const sx0 = x + f * 1, sy0 = fy - 26 + crouch;
-  const hand = (tx, ty, col, w) => { let ex = sx0 + f * tx, ey = fy + ty; const dx = ex - sx0, dy = ey - sy0, L = Math.hypot(dx, dy), Lm = 13; if (L > Lm) { ex = sx0 + dx / L * Lm; ey = sy0 + dy / L * Lm; } line(sx0, sy0, ex, ey, col, w || 3); R(ex - 1, ey - 1, 3, 3, C.skin); };
-  let backArm = [-sw * 5 * run - 1, -16 + crouch], frontArm = [sw * 5 * run + 2, -16 + crouch];
-  const bxl = (B.x - x) * f, byl = B.y - fy;
-  if (B.mode === 'held' && !sh && !dk) { frontArm = [bxl - 1, byl - 2]; backArm = [-3 - 2 * sw * run, -17 + crouch]; if (P.move && P.move.type === 'BTB') backArm = [bxl - 1, byl - 2]; }
-  if (sh) { if (sh.phase === 'gather') { frontArm = [bxl + 2, byl]; backArm = [bxl - 2, byl + 1]; } else { const fo = sh.launched ? 1 : 0; frontArm = [7 + fo * 2, -45 + fo * 2]; backArm = [3, -41 + fo * 3]; } }
-  if (dk) { const u = clamp(dk.t / dk.T, 0, 1); frontArm = [lerp(8, 20, clamp(u * 1.5, 0, 1)), lerp(-40, -50, clamp(u * 1.5, 0, 1))]; backArm = [lerp(3, 14, clamp(u * 1.5, 0, 1)), -46]; }
-  if (air && !sh && !dk) { frontArm = [5, -38]; backArm = [-2, -33]; }
-  hand(backArm[0], backArm[1], C.skinD, 3);
-  // torso + shorts
-  const ty = fy - 29 + crouch;
-  R(x - 4 + (f > 0 ? 0 : 0) - Math.round(lean * f * -0.5), ty, 9, 12, C.jersey); bx(-4 + 0, -29 + crouch, 9, 12, C.jersey);
-  bx(-4, -29 + crouch, 9, 2, C.trim); bx(-4, -19 + crouch, 9, 1, C.jerseyD); bx(-4, -29 + crouch, 1, 12, C.jerseyD);
-  bx(-4, -17 + crouch, 9, 6, C.shorts); bx(-4, -12 + crouch, 9, 1, C.trim);
-  // number on the chest (3x5)
-  textOn(ctx, '7', x + (f > 0 ? 0 : -2) - (f > 0 ? 0 : 0) + (f > 0 ? 1 : 0), ty + 4, '#fff', 1, null);
-  // front leg
-  lf = pt(legs[0][0], legs[0][1]); line(hip[0], hip[1], lf[0], lf[1] - 1, C.skin, 3); R(lf[0] - (f > 0 ? 1 : 3), lf[1] - 1, 5, 4, C.shoe); R(lf[0] - (f > 0 ? 1 : 3), lf[1] + 2, 5, 1, C.sole);
-  // head
-  const hy = fy - 38 + crouch, hx = f > 0 ? x - 4 : x - 4;
-  R(x - 1, fy - 31 + crouch, 3, 3, C.skinD);
-  R(hx + 0, hy + 1, 9, 8, C.skin); R(hx + 1, hy, 7, 1, C.hair); R(hx, hy + 1, 9, 2, C.hair); R(hx, hy + 3, 9, 2, C.band);
-  R(f > 0 ? hx + 6 : hx + 2, hy + 5, 1, 2, '#1a1a1a'); R(f > 0 ? hx + 8 : hx, hy + 4, 1, 4, C.skinD);
-  R(f > 0 ? hx : hx + 7, hy + 3, 2, 5, C.hair);
-  // front arm
-  hand(frontArm[0], frontArm[1], C.skin, 3);
+  let c = 0; if (sh && sh.phase === 'gather') c = 3 + sh.m * 2; else if (P.land > 0) c = 3 * (P.land / 0.12); else if (P.move) c = 2 + 3 * Math.sin(Math.PI * clamp(P.move.t / P.move.dur, 0, 1));
+  let ff, bf;                                                 // front / back foot (local coords)
+  if (air) { ff = [4, -9]; bf = [-3, -6]; if (dk || (sh && sh.phase === 'jump')) { ff = [3, -10]; bf = [-4, -5]; } }
+  else { ff = [3 + sw * 7 * run, -4 - Math.max(0, cw) * 3 * run]; bf = [-3 - sw * 7 * run, -4 - Math.max(0, -cw) * 3 * run]; }
+  const hipY = -8 + c;
+  const leg = (ft, col, hx) => { ln(hx, hipY, ft[0], ft[1] + 1, col, 4); rc(ft[0] - 1, ft[1] - 2, 4, 2, K.wh); rc(ft[0] - 3, ft[1], 9, 4, K.shoe); rc(ft[0] - 3, ft[1] + 3, 9, 1, K.shoeD); rc(ft[0] + 3, ft[1] + 1, 3, 1, K.rj); };
+  const hand = (tx, ty, col) => { let ex = tx, ey = ty; const sx0 = 1, sy0 = -22 + c, dx = ex - sx0, dy = ey - sy0, L = Math.hypot(dx, dy), Lm = 17; if (L > Lm) { ex = sx0 + dx / L * Lm; ey = sy0 + dy / L * Lm; } ln(sx0, sy0, ex, ey, col, 4); rc(Math.round(ex) - 2, Math.round(ey) - 2, 4, 4, K.s); };
+  // arm targets
+  let fa = [sw * 6 * run + 3, -15 + c], ba = [-sw * 6 * run - 1, -15 + c];
+  const bxl = (B.x - P.x) * f, byl = B.y - fy;
+  if (B.mode === 'held' && !sh && !dk) { fa = [bxl - 1, byl - 1]; ba = [-3, -16 + c]; if (P.move && P.move.type === 'BTB') ba = [bxl - 1, byl - 1]; }
+  if (sh) { if (sh.phase === 'gather') { fa = [bxl + 1, byl]; ba = [bxl - 3, byl + 1]; } else { const fo = sh.launched ? 1 : 0; fa = [8 + fo * 2, -44 + fo * 2]; ba = [3, -40 + fo * 3]; } }
+  if (dk) { const u = clamp(dk.t / dk.T, 0, 1), k = clamp(u * 1.5, 0, 1); fa = [lerp(10, 22, k), lerp(-40, -52, k)]; ba = [lerp(4, 15, k), -48]; }
+  if (air && !sh && !dk) { fa = [7, -38]; ba = [-1, -34]; }
+  // back-to-front
+  hand(ba[0], ba[1], K.sh); leg(bf, K.sh, -2);
+  rc(-6, -15 + c, 13, 7, K.rd); rc(-6, -15 + c, 13, 1, K.bk); rc(5, -14 + c, 1, 6, K.wh);        // shorts
+  rc(-5, -26 + c, 11, 11, K.rj); rc(-5, -26 + c, 11, 2, K.bk); rc(-5, -24 + c, 3, 9, K.bk); rc(-1, -24 + c, 2, 1, K.wh); rc(-5, -17 + c, 11, 2, K.rd); rc(4, -24 + c, 2, 7, K.rd);   // jersey
+  leg(ff, K.s, 2);
+  // big round head
+  const hy = -42 + c;
+  blob(-8, hy, 20, 16, K.s); rc(-6, hy + 13, 16, 2, K.sh); rc(-4, hy, 6, 1, K.hi); rc(-6, hy + 7, 3, 4, K.sh);
+  rc(-7, hy + 2, 18, 2, K.rj);                                                                    // headband
+  rc(1, hy + 5, 5, 5, K.wh); rc(7, hy + 5, 5, 5, K.wh); rc(4, hy + 6, 2, 3, K.bk); rc(10, hy + 6, 2, 3, K.bk);   // big eyes
+  rc(2, hy + 4, 4, 1, K.bk); rc(8, hy + 4, 4, 1, K.bk); rc(6, hy + 12, 5, 1, K.bk);
+  hand(fa[0], fa[1], K.s);
+  // black outline: stamp the silhouette around the sprite
+  sg.globalCompositeOperation = 'source-over'; sg.clearRect(0, 0, 96, 96); sg.drawImage(pc, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = K.bk; sg.fillRect(0, 0, 96, 96);
+  const ox = x - 48, oy = fy - 72;
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(sc2, ox + dx, oy + dy);
+  ctx.drawImage(pc, ox, oy);
 }
 function drawShotMeter() {
   const s = P.shot; if (!s || s.phase !== 'gather') return;
@@ -491,6 +499,7 @@ function drawHUD() {
   if (!IS_TOUCH && S.t < 14) { const t = 'A/D MOVE  SHIFT RUN  W JUMP  SPACE SHOOT  E DUNK  Z X C MOVES'; text(t, W / 2 - tw(t, 1) / 2, 262, '#fff', 1, '#0b0f24'); }
 }
 function draw() {
+  if (S.state === 'loading') { drawLoading(); return; }
   ctx.save();
   if (S.shake > 0) ctx.translate(Math.round((rnd() - 0.5) * 6 * S.shake), Math.round((rnd() - 0.5) * 6 * S.shake));
   ctx.drawImage(bg, 0, 0);
@@ -504,6 +513,36 @@ function draw() {
   for (const f of FX) { const y = f.y - f.t * 22, a = 1 - Math.max(0, f.t - 0.7) / 0.4, w = tw(f.txt, 1); if (a > 0.2) text(f.txt, f.x - w / 2, y, f.col, 1, '#0b0f24'); }
   ctx.restore();
   if (S.state === 'title') drawTitle(); else drawHUD();
+}
+const TIPS = ['TIP: GREEN RELEASE = BEST ODDS', 'TIP: CHAIN Z X C FOR COMBOS', 'TIP: SHOTS FROM HALF COURT ARE 5%', 'TIP: GET CLOSE AND DUNK IT', 'TIP: MISSES ARE LIVE - GRAB THE REBOUND'];
+const LOAD = { i: 0, shown: 0, t: 0, done: false, steps: [['PAINTING THE GYM', () => paintGym(bg.getContext('2d'))], ['LACING UP SNEAKERS', () => { P.anim = 0; }], ['INFLATING THE BALL', () => { }], ['WARMING UP THE CROWD', () => { }], ['TURNING ON THE LIGHTS', () => { }]] };
+function updateLoading(dt) {
+  LOAD.t += dt;
+  if (LOAD.i < LOAD.steps.length && LOAD.t > 0.25 + LOAD.i * 0.3) { LOAD.steps[LOAD.i][1](); LOAD.i++; }
+  const target = Math.min(LOAD.i / LOAD.steps.length, clamp(LOAD.t / 2.0, 0, 1));
+  LOAD.shown += (target - LOAD.shown) * (1 - Math.exp(-6 * dt));
+  P.anim += dt * 7;
+  if (LOAD.i >= LOAD.steps.length && LOAD.t > 2.1 && LOAD.shown > 0.985) { S.state = 'title'; S.t = 0; }
+}
+function drawLoading() {
+  R(0, 0, W, H, '#070b1f');
+  for (let i = 0; i < 46; i++) { const sx = (i * 97) % W, sy = (i * 53) % 150, tw2 = (Math.floor(LOAD.t * 3 + i) % 4 === 0); R(sx, sy, tw2 ? 2 : 1, tw2 ? 2 : 1, tw2 ? '#fff' : '#3b4a8a'); }
+  const t = 'PIXEL', t2 = 'LEAGUE';
+  text(t, W / 2 - tw(t, 8) / 2, 40, C.gold, 8, '#c2410c'); text(t2, W / 2 - tw(t2, 8) / 2, 84, '#fff', 8, '#2354cc');
+  const bx = 90, by = 206, bw = 300;
+  R(bx - 2, by - 2, bw + 4, 14, '#fff'); R(bx, by, bw, 10, '#0b0f24');
+  const fw = Math.round(bw * LOAD.shown); R(bx, by, fw, 10, C.gold); R(bx, by, fw, 3, '#fff3b0'); for (let x = bx + 6; x < bx + fw; x += 10) R(x, by, 2, 10, '#e0a800');
+  // the player runs along the bar dribbling
+  const sv = { x: P.x, speed: P.speed, face: P.face, h: P.h, anim: P.anim, shot: P.shot, dunk: P.dunk, move: P.move, land: P.land }, bsv = { x: B.x, y: B.y, mode: B.mode };
+  P.x = bx + bw * LOAD.shown; P.speed = 110; P.face = 1; P.h = 0; P.shot = null; P.dunk = null; P.move = null; P.land = 0;
+  const base = by - 2; const bounce = Math.abs(Math.sin(LOAD.t * 7)); B.x = P.x + 11; B.y = base - 5 - bounce * 16; B.mode = 'held';
+  drawPlayer(base, base); drawBall(B.x, B.y, LOAD.t * 6);
+  Object.assign(P, sv); Object.assign(B, bsv);
+  const st = LOAD.i < LOAD.steps.length ? LOAD.steps[LOAD.i][0] : 'READY!';
+  const dots = '.'.repeat(Math.floor(LOAD.t * 3) % 4);
+  text(st + dots, W / 2 - tw(st, 2) / 2, 226, '#fff', 2, '#0b0f24');
+  const tip = TIPS[Math.floor(LOAD.t / 1.3) % TIPS.length]; text(tip, W / 2 - tw(tip, 1) / 2, 252, '#9fb4ff');
+  text(Math.round(LOAD.shown * 100) + '%', bx + bw + 8, by + 3, '#fff');
 }
 function drawTitle() {
   R(0, 0, W, H, 'rgba(4,8,28,.72)');
@@ -520,6 +559,7 @@ const KEYS = {};
 addEventListener('keydown', e => {
   if (e.repeat) { if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); return; }
   audioInit();
+  if (S.state === 'loading') return;
   if (S.state === 'title') { if (e.code === 'Space' || e.code === 'Enter') { start(); e.preventDefault(); } return; }
   switch (e.code) {
     case 'KeyA': case 'ArrowLeft': IN.left = true; break;
@@ -550,7 +590,7 @@ function start() { resetGame(); S.state = 'play'; S.t = 0; }
 // touch
 function hold(id, down, up) {
   const el = document.getElementById(id);
-  el.addEventListener('pointerdown', e => { e.preventDefault(); audioInit(); if (S.state === 'title') { start(); return; } try { el.setPointerCapture(e.pointerId); } catch (_) {} el.classList.add('down'); down(); });
+  el.addEventListener('pointerdown', e => { e.preventDefault(); audioInit(); if (S.state !== 'play') { if (S.state === 'title') start(); return; } try { el.setPointerCapture(e.pointerId); } catch (_) {} el.classList.add('down'); down(); });
   const end = () => { el.classList.remove('down'); if (up) up(); };
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
 }
@@ -560,7 +600,7 @@ hold('mZ', () => startMove('CROSS')); hold('mX', () => startMove('STEP')); hold(
 (function joy() {
   const el = document.getElementById('joy'), th = document.getElementById('jt'); let id = null;
   const mv = (cx) => { const r = el.getBoundingClientRect(), ox = r.left + r.width / 2, max = r.width * 0.32; let dx = cx - ox; dx = clamp(dx, -max, max); th.style.transform = 'translate(' + dx + 'px,0)'; IN.ax = dx / max; };
-  el.addEventListener('pointerdown', e => { e.preventDefault(); audioInit(); if (S.state === 'title') { start(); return; } id = e.pointerId; try { el.setPointerCapture(id); } catch (_) {} mv(e.clientX); });
+  el.addEventListener('pointerdown', e => { e.preventDefault(); audioInit(); if (S.state !== 'play') { if (S.state === 'title') start(); return; } id = e.pointerId; try { el.setPointerCapture(id); } catch (_) {} mv(e.clientX); });
   el.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e.clientX); });
   const end = e => { if (e.pointerId !== id) return; id = null; th.style.transform = ''; IN.ax = 0; };
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
@@ -574,7 +614,7 @@ function fit() { const s = Math.min(innerWidth / W, innerHeight / H); cv.style.w
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 150)); fit();
 let last = performance.now();
 function frame(now) { requestAnimationFrame(frame); const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now; update(dt); draw(); }
-paintGym(bg.getContext('2d')); requestAnimationFrame(frame);
+requestAnimationFrame(frame);
 window.__PL = { P, B, S, IN, planShot, shotChance, greenChance, stepBall, ballCB, resetGame, start, onShootDown, onShootUp, startDunk, startMove, jump, update, draw, HX, RIMY, GROUND, METER };
 </script>
 </body>
